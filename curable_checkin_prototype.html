@@ -1,0 +1,969 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Curable — Nalam Check-in</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#1D9E75; --green-d:#0F6E56; --green-lt:#E1F5EE;
+  --red:#DC2626; --red-lt:#FEE2E2;
+  --amber:#F59E0B; --amber-lt:#FEF3C7;
+  --blue:#2563EB; --blue-lt:#EFF6FF;
+  --violet:#7C3AED; --violet-lt:#F1E9FE;
+  --t1:#14150F; --t2:#40412F; --t3:#7C7C6C;
+  --bg:#F7F6F1; --bg2:#EFEDE4; --white:#fff; --b1:#E2E1D6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{height:100%}
+body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var(--t1);height:100%;height:calc(var(--vh,1vh) * 100);overflow:hidden}
+.app{max-width:460px;margin:0 auto;height:100%;height:calc(var(--vh,1vh) * 100);display:flex;flex-direction:column;background:var(--white);box-shadow:0 0 40px rgba(0,0,0,.06);position:relative}
+
+/* HEADER */
+.head{padding:16px 18px 14px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.head-top{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.avatar{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,var(--green),var(--green-d));display:flex;align-items:center;justify-content:center;color:#fff;font-family:'Fraunces',serif;font-weight:600;font-size:16px;flex-shrink:0}
+.head-name{font-family:'Fraunces',serif;font-weight:600;font-size:16.5px;line-height:1.15}
+.head-sub{font-size:11.5px;color:var(--t3);margin-top:1px}
+.progress-row{display:flex;gap:5px}
+.progress-track{height:5px;flex:1;border-radius:3px;background:var(--b1);overflow:hidden}
+.progress-fill{display:block;height:100%;width:0%;background:var(--green);border-radius:3px;transition:width .5s ease}
+
+/* CHAT */
+.chat{flex:1;overflow-y:auto;padding:18px 16px 10px;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}
+.row{display:flex;gap:8px;align-items:flex-end;max-width:100%}
+.row.user{justify-content:flex-end}
+.bub-avatar{width:26px;height:26px;border-radius:50%;background:var(--green-lt);color:var(--green-d);display:flex;align-items:center;justify-content:center;font-family:'Fraunces',serif;font-weight:600;font-size:12px;flex-shrink:0}
+.bub{max-width:78%;padding:10px 13px;border-radius:16px;font-size:14px;line-height:1.5;animation:pop .25s ease}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.bub.bot{background:var(--bg2);color:var(--t1);border-bottom-left-radius:4px}
+.bub.user{background:var(--green);color:#fff;border-bottom-right-radius:4px}
+.bub.crisis{background:var(--violet-lt);border:1px solid #DDD0FA;color:#3B1E7A}
+.spacer{margin:14px 0 4px;display:flex;align-items:center}
+.spacer::before{content:"";flex:1;height:1px;background:var(--b1)}
+
+.typing{display:flex;gap:4px;padding:12px 14px;background:var(--bg2);border-radius:16px;border-bottom-left-radius:4px;width:fit-content}
+.typing span{width:6px;height:6px;border-radius:50%;background:var(--t3);opacity:.4;animation:blink 1.1s infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes blink{0%,60%,100%{opacity:.3;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+
+/* CHIPS */
+.chips{display:flex;flex-wrap:wrap;gap:8px;padding:2px 2px 4px 34px}
+.chip{padding:9px 14px;border:1.5px solid var(--b1);border-radius:20px;background:#fff;font-size:13.5px;font-weight:500;cursor:pointer;transition:.15s;color:var(--t2)}
+.chip:hover{border-color:var(--green);color:var(--green-d);background:var(--green-lt)}
+.chip.picked{background:var(--green);border-color:var(--green);color:#fff}
+.chip.subtle{color:var(--t3);border-style:dashed}
+.chip-continue-wrap{width:100%;padding-left:34px;margin-top:6px}
+.chip-continue-btn{width:100%;padding:12px;background:var(--t1);color:#fff;border:none;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;transition:.15s}
+.chip-continue-btn:not(:disabled):hover{background:#000}
+.chip-continue-btn .count{opacity:.65;font-weight:500}
+.fact-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding-left:34px}
+.fact-field{grid-column:span 1}
+.fact-field.full{grid-column:1/-1}
+.fact-field label{font-size:11px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.03em;display:block;margin-bottom:4px}
+.fact-field input,.fact-field select{width:100%;padding:9px 11px;border:1.5px solid var(--b1);border-radius:10px;font-size:14px;font-family:inherit;background:#fff}
+.fact-field input:focus,.fact-field select:focus{outline:none;border-color:var(--green)}
+.fact-continue{grid-column:1/-1;margin-top:4px;padding:11px;background:var(--green);color:#fff;border:none;border-radius:10px;font-weight:600;font-size:14px;cursor:pointer}
+.fact-continue:disabled{background:var(--b1);color:var(--t3);cursor:not-allowed}
+
+/* SUMMARY CARDS */
+.summary-wrap{padding-left:34px;display:flex;flex-direction:column;gap:8px;width:100%}
+.sum-card{border:1.5px solid var(--b1);border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:12px}
+.sum-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.sum-body{flex:1}
+.sum-title{font-size:13.5px;font-weight:600}
+.sum-note{font-size:12px;color:var(--t3);margin-top:1px}
+.sum-badge{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:20px;text-transform:uppercase;letter-spacing:.03em;flex-shrink:0}
+.badge-low{background:var(--green-lt);color:var(--green-d)}
+.badge-mod{background:var(--amber-lt);color:#92400E}
+.badge-high{background:var(--red-lt);color:#991B1B}
+.badge-skip{background:var(--bg2);color:var(--t3)}
+.cta{margin-top:6px;padding:13px;background:var(--t1);color:#fff;border:none;border-radius:12px;font-weight:600;font-size:14px;cursor:pointer;width:100%}
+.disclaimer{padding-left:34px;font-size:11px;color:var(--t3);line-height:1.5;padding-top:2px}
+
+/* INPUT BAR */
+.inputbar{flex-shrink:0;border-top:1px solid var(--b1);padding:10px 14px 14px;display:flex;gap:8px;align-items:flex-end;background:#fff}
+.inputbar.hidden{display:none}
+.text-input{flex:1;border:1.5px solid var(--b1);border-radius:22px;padding:11px 16px;font-size:14px;font-family:inherit;resize:none;max-height:90px;line-height:1.4}
+.text-input:focus{outline:none;border-color:var(--green)}
+.mic-btn,.send-btn{width:42px;height:42px;border-radius:50%;border:none;flex-shrink:0;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.mic-btn{background:var(--bg2);color:var(--t2)}
+.mic-btn.listening{background:var(--red);color:#fff;animation:pulse 1.2s infinite}
+@keyframes pulse{0%{box-shadow:0 0 0 0 rgba(220,38,38,.4)}70%{box-shadow:0 0 0 10px rgba(220,38,38,0)}100%{box-shadow:0 0 0 0 rgba(220,38,38,0)}}
+.send-btn{background:var(--green);color:#fff}
+.mic-note{font-size:10.5px;color:var(--t3);text-align:center;padding:0 14px 8px;flex-shrink:0}
+
+.privacy-pill{position:absolute;top:14px;right:14px;font-size:10px;background:var(--green-lt);color:var(--green-d);padding:4px 9px;border-radius:20px;font-weight:600;display:none}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="head">
+    <div class="head-top">
+      <div class="avatar">N</div>
+      <div>
+        <div class="head-name">Nalam</div>
+        <div class="head-sub" id="headSub">Your wellbeing check-in · TCS Chennai</div>
+      </div>
+    </div>
+    <div class="progress-row" id="progressRow"></div>
+  </div>
+
+  <div class="chat" id="chat"></div>
+
+  <div class="inputbar" id="inputbar">
+    <textarea class="text-input" id="textInput" placeholder="Type your answer…" rows="1"></textarea>
+    <button class="mic-btn" id="micBtn" title="Speak your answer">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+    </button>
+    <button class="send-btn" id="sendBtn" title="Send">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    </button>
+  </div>
+  <div class="mic-note" id="micNote" style="display:none">Listening — speak now, then pause</div>
+</div>
+
+<script>
+/* ============================================================
+   PROTOTYPE NOTE (read this before wiring to production):
+   The "AI extraction" below is simulated with lightweight keyword
+   matching so the flow can be demoed with no backend. In production
+   this step is replaced by: STT -> LLM extraction into the same
+   structured fields -> deterministic scoring engine (per the
+   architecture already discussed). The chat UI, state machine,
+   pacing and gap-fill logic are the real design; the scoring math
+   is illustrative, not clinical.
+   ============================================================ */
+
+const DOMAINS = ['cardiac','diabetes','cancer','mental'];
+const DOMAIN_META = {
+  cardiac:{label:'Heart & circulation', color:'var(--red)', icon:'♥'},
+  diabetes:{label:'Diabetes risk', color:'var(--amber)', icon:'◆'},
+  cancer:{label:'Cancer red-flags', color:'var(--blue)', icon:'✦'},
+  mental:{label:'Mind & stress', color:'var(--violet)', icon:'●'}
+};
+
+const state = {
+  step:0,
+  facts:{}, shared:{profile:[]}, conditions:[], conditionsDetail:{managed:null, extra:null},
+  famHistoryFlat:[], famDetail:{side:null, onset:null},
+  lifestyleExtra:{activity:null, diet:null}, physicalDetail:{energy:null, duration:null},
+  womens:{pcod:null, cycle:null, anemia:null, extra:null},
+  domainData:{cardiac:{symptoms:[],famHistory:null}, diabetes:{symptoms:[],famHistory:null}, cancer:{symptoms:[],famHistory:null}, mental:{level:null,freq:null,impact:null,support:null,skipped:false}},
+  openCapture:null,
+  crisisTriggered:false
+};
+
+const chatEl = document.getElementById('chat');
+const progressRow = document.getElementById('progressRow');
+const inputbar = document.getElementById('inputbar');
+const textInput = document.getElementById('textInput');
+const micNote = document.getElementById('micNote');
+
+const progressTrack = document.createElement('div');
+progressTrack.className='progress-track';
+const progressFill = document.createElement('div');
+progressFill.className='progress-fill';
+progressTrack.appendChild(progressFill);
+progressRow.appendChild(progressTrack);
+
+function setProgress(pct){
+  progressFill.style.width = Math.min(100, Math.max(0,pct)) + '%';
+}
+
+function scrollDown(){ requestAnimationFrame(()=>{ chatEl.scrollTop = chatEl.scrollHeight; }); }
+
+function pick(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
+
+function addSpacer(){
+  const div = document.createElement('div');
+  div.className='spacer';
+  chatEl.appendChild(div); scrollDown();
+}
+
+function botTyping(){
+  const row = document.createElement('div');
+  row.className='row'; row.id='typingRow';
+  row.innerHTML = `<div class="bub-avatar">N</div><div class="typing"><span></span><span></span><span></span></div>`;
+  chatEl.appendChild(row); scrollDown();
+  return row;
+}
+
+function botSay(text, delay=650){
+  return new Promise(res=>{
+    const typingRow = botTyping();
+    setTimeout(()=>{
+      typingRow.remove();
+      const row = document.createElement('div');
+      row.className='row';
+      row.innerHTML = `<div class="bub-avatar">N</div><div class="bub bot">${text}</div>`;
+      chatEl.appendChild(row); scrollDown();
+      res();
+    }, delay);
+  });
+}
+
+function userSay(text){
+  const row = document.createElement('div');
+  row.className='row user';
+  row.innerHTML = `<div class="bub user">${text}</div>`;
+  chatEl.appendChild(row); scrollDown();
+}
+
+function clearChips(){
+  document.querySelectorAll('.chips,.fact-grid,.chip-continue-wrap').forEach(el=>el.remove());
+}
+
+function showChips(options, onPick, opts={}){
+  clearChips();
+  lastShowChipsOptions = options;
+  lastShowChipsOpts = opts;
+  const wrap = document.createElement('div');
+  wrap.className='chips';
+  options.forEach(opt=>{
+    const c = document.createElement('div');
+    c.className='chip'+(opt.subtle?' subtle':'');
+    c.textContent = opt.label;
+    c.onclick = ()=>{
+      if(opts.multi){
+        c.classList.toggle('picked');
+        updateContinueLabel();
+      } else {
+        userSay(opt.label);
+        wrap.remove();
+        onPick(opt.value !== undefined ? opt.value : opt.label);
+      }
+    };
+    wrap.appendChild(c);
+  });
+  chatEl.appendChild(wrap);
+
+  let continueWrap = null, continueBtn = null;
+  function updateContinueLabel(){
+    if(!continueBtn) return;
+    const n = wrap.querySelectorAll('.picked').length;
+    continueBtn.innerHTML = n ? `Continue <span class="count">· ${n} selected</span> →` : `Continue with none of these →`;
+  }
+  if(opts.multi){
+    continueWrap = document.createElement('div');
+    continueWrap.className='chip-continue-wrap';
+    continueBtn = document.createElement('button');
+    continueBtn.className='chip-continue-btn';
+    continueBtn.textContent = 'Continue with none of these →';
+    continueBtn.onclick = ()=>{
+      const picked = [...wrap.querySelectorAll('.picked')].map(el=>el.textContent);
+      userSay(picked.length? picked.join(', ') : 'None of these');
+      wrap.remove();
+      continueWrap.remove();
+      onPick(picked);
+    };
+    continueWrap.appendChild(continueBtn);
+    chatEl.appendChild(continueWrap);
+  }
+  scrollDown();
+  inputbar.classList.remove('hidden');
+  pendingTextHandler = onPick;
+}
+
+let pendingTextHandler = null;
+let lastShowChipsOptions = null;
+let lastShowChipsOpts = null;
+
+/* try to match a spoken/typed free-text answer to one of the current chip options */
+function matchOption(text, options){
+  const l = text.toLowerCase();
+  let best = null, bestScore = 0;
+  options.forEach(o=>{
+    const words = o.label.toLowerCase().replace(/[^a-z0-9 ]/g,'').split(' ').filter(w=>w.length>3);
+    let score = 0;
+    words.forEach(w=>{ if(l.includes(w)) score++; });
+    if(score > bestScore){ bestScore = score; best = o; }
+  });
+  if(best) return best;
+  const yesOpt = options.find(o=>/^yes/i.test(o.label));
+  const noOpt = options.find(o=>/^no\b/i.test(o.label));
+  const dunnoOpt = options.find(o=>/don.?t know/i.test(o.label));
+  if(yesOpt && /\b(yes|yeah|yep|yup|definitely)\b/.test(l)) return yesOpt;
+  if(noOpt && /\b(no|nope|nah|never)\b/.test(l)) return noOpt;
+  if(dunnoOpt && /(not sure|don.?t know|no idea|unsure)/.test(l)) return dunnoOpt;
+  return null;
+}
+
+/* free-text/voice submit path */
+function submitFreeText(){
+  const val = textInput.value.trim();
+  if(!val) return;
+  textInput.value='';
+  const handler = pendingTextHandler;
+  const opts = lastShowChipsOpts || {};
+  const options = lastShowChipsOptions;
+  clearChips();
+  userSay(val);
+  checkCrisis(val);
+  if(state.crisisTriggered || !handler) return;
+
+  if(opts.multi){
+    let matchedLabels = [];
+    if(opts.multiKeywords){
+      const l = val.toLowerCase();
+      Object.keys(opts.multiKeywords).forEach(label=>{
+        if(opts.multiKeywords[label].some(k=>l.includes(k))) matchedLabels.push(label);
+      });
+    }
+    handler(matchedLabels);
+    return;
+  }
+
+  // structured question (family history, tobacco, frequency, impact, etc.) —
+  // try to understand a spoken/typed answer as one of the current options
+  if(!opts.allowText && options){
+    const matched = matchOption(val, options);
+    if(matched){
+      handler(matched.value !== undefined ? matched.value : matched.label, false);
+      return;
+    }
+  }
+
+  // open question — pass raw text through to the domain's own extraction logic
+  handler(val, true);
+}
+
+document.getElementById('sendBtn').onclick = submitFreeText;
+textInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); submitFreeText(); }
+});
+
+/* ---- crisis detection (runs on every free-text turn) ---- */
+const CRISIS_WORDS = ['end my life','suicide','kill myself','not worth living','harm myself','hopeless about everything'];
+function checkCrisis(text){
+  const lower = text.toLowerCase();
+  if(CRISIS_WORDS.some(w=>lower.includes(w))){
+    state.crisisTriggered = true;
+    inputbar.classList.add('hidden');
+    botSay(`<strong>Thank you for telling me that.</strong> This matters more than the check-in — I've paused it. Someone from our care team will reach out to you privately and quickly. If you need to talk to someone right now, iCall is free and confidential: 9152987821.`, 400)
+      .then(()=>{
+        const row = document.createElement('div');
+        row.className='row';
+        row.innerHTML = `<div class="bub-avatar">N</div><div class="bub crisis">You're not being scored or judged on this. This part of the conversation goes only to a real person on the care team — not to your employer.</div>`;
+        chatEl.appendChild(row); scrollDown();
+      });
+  }
+}
+
+/* ---- simple keyword extraction (demo stand-in for LLM extraction) ---- */
+const KEYWORDS = {
+  cardiac:{chestPain:['chest pain','chest discomfort','tightness'],breathless:['breathless','short of breath','breathing'],palpitations:['racing heart','palpitation','heart racing'],swelling:['swollen','swelling'],fatigue:['tired','fatigue','exhausted'],dizzy:['dizzy','faint']},
+  diabetes:{thirst:['thirsty','thirst','urination','peeing a lot'],weight:['weight loss','losing weight','weight gain'],tingling:['tingling','numbness','numb'],vision:['blurred vision','vision']},
+  cancer:{lump:['lump','swelling that','growth'],sore:['sore','ulcer','wound','not healing'],bleeding:['bleeding','blood'],cough:['cough','hoarse','voice change'],pain:['persistent pain','pain that']}
+};
+const CONDITION_KEYWORDS = {
+  'Allergies':['allergy','allergic','allergies'],
+  'Asthma':['asthma','wheeze','wheezing','inhaler'],
+  'Thyroid problems':['thyroid','hypothyroid','hyperthyroid'],
+  'Kidney problems':['kidney','renal'],
+  'Pre-diabetes / borderline sugar':['pre-diabetic','prediabetic','pre diabetic','borderline sugar','borderline diabetes']
+};
+const LIFESTYLE_KEYWORDS = {
+  'Smoke cigarettes':['smoke','smoking','cigarette'],
+  'Use tobacco / gutkha / paan':['gutkha','chewing tobacco','paan','chew tobacco','chews tobacco','chewing gutkha'],
+  'Vape / e-cigarettes':['vape','vaping','e-cigarette','e cig','e-cig'],
+  'Drink alcohol regularly':['drink','alcohol','beer','wine'],
+  'Rarely exercise':['no exercise',"don't exercise",'sedentary','not active','no workout','never exercise'],
+  'Sleep poorly':['sleep poorly','bad sleep',"can't sleep",'insomnia','poor sleep','sleep badly']
+};
+const FAMILY_KEYWORDS = {
+  'Heart disease':['heart','cardiac','bp','blood pressure'],
+  'Diabetes':['diabet','sugar'],
+  'Cancer':['cancer','tumour','tumor'],
+  'Thyroid problems':['thyroid'],
+  'Kidney problems':['kidney','renal'],
+  'Asthma or allergies':['asthma','allerg']
+};
+function extractFlags(domain, text){
+  const lower = text.toLowerCase();
+  const found = [];
+  const dict = KEYWORDS[domain] || {};
+  Object.keys(dict).forEach(flag=>{
+    if(dict[flag].some(k=>lower.includes(k))) found.push(flag);
+  });
+  return found;
+}
+function soundsClear(text){
+  const l = text.toLowerCase();
+  return ['nothing','none','fine','okay','good','no issue','no concern','all good','doing well'].some(k=>l.includes(k)) && found_length_check(l);
+}
+function found_length_check(l){ return l.length < 60; } // short + reassuring phrase = likely a "clear" answer
+
+/* Parses ONE open-ended answer across every topic at once — this is what
+   powers "employee talks first, AI only fills gaps." A real build swaps
+   this for the LLM extraction call; the keyword logic is a stand-in. */
+function extractAllDomains(text){
+  const l = text.toLowerCase();
+  const out = {
+    cardiac: extractFlags('cardiac', l),
+    diabetes: extractFlags('diabetes', l),
+    cancer: extractFlags('cancer', l),
+    conditions: [],
+    lifestyle: [],
+    fam: [],
+    mentalFlag: false,
+    womens: {pcod:null, cycle:null, anemia:null}
+  };
+  Object.keys(CONDITION_KEYWORDS).forEach(label=>{
+    if(CONDITION_KEYWORDS[label].some(k=>l.includes(k))) out.conditions.push(label);
+  });
+  Object.keys(LIFESTYLE_KEYWORDS).forEach(label=>{
+    if(LIFESTYLE_KEYWORDS[label].some(k=>l.includes(k))) out.lifestyle.push(label);
+  });
+  const sentences = l.split(/[.,;!?]+/);
+  const relWords = ['dad','father','mom','mother','parent','brother','sister','sibling','family'];
+  sentences.forEach(s=>{
+    if(!relWords.some(r=>s.includes(r))) return;
+    Object.keys(FAMILY_KEYWORDS).forEach(label=>{
+      if(FAMILY_KEYWORDS[label].some(k=>s.includes(k)) && !out.fam.includes(label)) out.fam.push(label);
+    });
+  });
+  if(/\bstress|anxious|anxiety|low mood|not enjoying|depress|overwhelm|down lately|mentally exhausted|burnt? ?out/.test(l)) out.mentalFlag = true;
+  if(/pcod|pcos|polycystic/.test(l)) out.womens.pcod = true;
+  if(/irregular period|irregular cycle|painful period|period pain|heavy period/.test(l)) out.womens.cycle = true;
+  if(/an[ae]mia|low iron|low hemoglobin|low haemoglobin/.test(l)) out.womens.anemia = true;
+  return out;
+}
+
+/* ============================================================
+   SCRIPT
+   ============================================================ */
+async function start(){
+  await botSay(`Hi 👋 I'm Nalam — I'll spend about 4–5 minutes understanding how you're doing, health-wise.`);
+  await botSay(`Your individual answers stay private with the care team. Your employer only ever sees anonymous, aggregated numbers — never your name against an answer.`);
+  await botSay(`Ready when you are.`);
+  showChips([{label:"Let's start",value:'go'}], ()=>askFacts());
+}
+
+function askFacts(){
+  clearChips();
+  botTyping();
+  setTimeout(()=>{
+    document.getElementById('typingRow').remove();
+    const row = document.createElement('div');
+    row.className='row';
+    row.innerHTML = `<div class="bub-avatar">N</div><div class="bub bot">First, a few quick basics — no need to think hard about these.</div>`;
+    chatEl.appendChild(row);
+
+    const grid = document.createElement('div');
+    grid.className='fact-grid';
+    grid.innerHTML = `
+      <div class="fact-field full"><label>Name</label><input type="text" id="f-name" placeholder="As you'd like us to address you"></div>
+      <div class="fact-field"><label>Age</label><input type="number" id="f-age" placeholder="34"></div>
+      <div class="fact-field"><label>Gender</label>
+        <select id="f-gender"><option value="">Select</option><option>Female</option><option>Male</option><option>Prefer not to say</option></select>
+      </div>
+      <div class="fact-field"><label>Height (cm)</label><input type="number" id="f-height" placeholder="168"></div>
+      <div class="fact-field"><label>Weight (kg)</label><input type="number" id="f-weight" placeholder="72"></div>
+      <button class="fact-continue" id="factContinue" disabled>Continue →</button>
+    `;
+    chatEl.appendChild(grid); scrollDown();
+    inputbar.classList.add('hidden');
+
+    const ids = ['f-name','f-age','f-gender','f-height','f-weight'];
+    const btn = document.getElementById('factContinue');
+    function checkFilled(){
+      btn.disabled = ids.some(id=>!document.getElementById(id).value);
+    }
+    ids.forEach(id=>document.getElementById(id).addEventListener('input',checkFilled));
+
+    btn.onclick = ()=>{
+      state.facts.name = document.getElementById('f-name').value.trim();
+      state.facts.age = document.getElementById('f-age').value;
+      state.facts.gender = document.getElementById('f-gender').value;
+      const h = parseFloat(document.getElementById('f-height').value)/100;
+      const w = parseFloat(document.getElementById('f-weight').value);
+      state.facts.bmi = (w/(h*h)).toFixed(1);
+      userSay(`${state.facts.name} · ${state.facts.age} yrs · ${state.facts.gender} · ${document.getElementById('f-height').value}cm · ${document.getElementById('f-weight').value}kg`);
+      grid.remove();
+      setProgress(8);
+      runOpenKickoff();
+    };
+  }, 500);
+}
+
+/* ============================================================
+   THE FLOW BELOW IS DELIBERATELY NOT SPLIT INTO DISEASE-NAMED
+   SECTIONS. The employee talks first in one open answer; the
+   system silently tags what it caught across every topic; each
+   step below only asks about whatever's still unknown. Nothing
+   in the visible conversation ever says "cardiac"/"diabetes"/
+   "cancer" — that categorisation happens only behind the scenes,
+   in state.domainData, for scoring and the final summary.
+   ============================================================ */
+async function runOpenKickoff(){
+  await botSay(`Now the main part — and there's no fixed script here. Just tell me, in your own words, how you've been doing overall lately: energy, any aches or symptoms, sleep, habits, family health history, stress — anything at all. I'll only ask you about whatever you don't cover.`);
+  showChips([{label:"I'd rather answer question by question", subtle:true}], async (val, isText)=>{
+    if(!isText){
+      state.openCapture = null;
+      return runPhysicalCatchup();
+    }
+    state.openCapture = extractAllDomains(val);
+    await showRecap(state.openCapture);
+    runPhysicalCatchup();
+  }, {allowText:true});
+}
+
+async function showRecap(cap){
+  const bits = [];
+  if(cap.cardiac.length || cap.diabetes.length || cap.cancer.length) bits.push('a couple of physical things worth a closer look');
+  if(cap.conditions.length) bits.push(cap.conditions.join(', ').toLowerCase());
+  if(cap.lifestyle.length) bits.push(cap.lifestyle.join(' · '));
+  if(cap.fam.length) bits.push('some family health history');
+  if(cap.mentalFlag) bits.push('a mention of stress or mood');
+  if(cap.womens.pcod || cap.womens.cycle || cap.womens.anemia) bits.push("a couple of women's health notes");
+  const text = bits.length
+    ? `Here's what I caught: ${bits.join('; ')}. I'll just fill in a couple of gaps now.`
+    : `Nothing concerning jumped out there — I still have a few quick gaps to check.`;
+  await botSay(text);
+}
+
+/* ---- physical symptoms: one neutral catch-up, not three named ones ---- */
+async function runPhysicalCatchup(){
+  const cap = state.openCapture;
+  const alreadyFlagged = cap && (cap.cardiac.length || cap.diabetes.length || cap.cancer.length);
+  if(cap){
+    state.domainData.cardiac.symptoms = cap.cardiac;
+    state.domainData.diabetes.symptoms = cap.diabetes;
+    state.domainData.cancer.symptoms = cap.cancer;
+  }
+  addSpacer();
+  setProgress(20);
+  if(alreadyFlagged){
+    await botSay(`Thanks for flagging that earlier — noted, and there's no need to repeat it. Anything else physically you'd like to add, or shall we move on?`);
+  } else {
+    await botSay(`Let's start easy — nothing here needs a "correct" answer, just however you're feeling. Anything physically you'd like to flag — energy, breathing, digestion, urination, skin, any lump or sore? Or all clear?`);
+  }
+  let flaggedNow = false;
+  await new Promise(resolve=>{
+    showChips([{label:'All clear here'}], async (val, isText)=>{
+      if(isText){
+        const c = extractFlags('cardiac', val), d = extractFlags('diabetes', val), k = extractFlags('cancer', val);
+        state.domainData.cardiac.symptoms = [...new Set([...state.domainData.cardiac.symptoms, ...c])];
+        state.domainData.diabetes.symptoms = [...new Set([...state.domainData.diabetes.symptoms, ...d])];
+        state.domainData.cancer.symptoms = [...new Set([...state.domainData.cancer.symptoms, ...k])];
+        flaggedNow = c.length||d.length||k.length;
+        await botSay(flaggedNow ? pick([`Thanks for telling me that.`,`Appreciate you sharing that.`,`Got it, thank you.`]) : `Got it, thank you.`);
+      } else {
+        await botSay(pick([`Good to hear.`,`Great, glad to hear it.`]));
+      }
+      resolve();
+    }, {allowText:true});
+  });
+
+  // Q2 — light, warm, universal (works whether or not anything was flagged)
+  await botSay(`No wrong answer here — generally speaking, how's your energy most days?`);
+  await new Promise(resolve=>{
+    showChips([{label:'Good'},{label:'Okay'},{label:'Often low'}], (v)=>{
+      state.physicalDetail.energy = v;
+      resolve();
+    });
+  });
+
+  // Q3 — only if something was actually flagged (kickoff or just now), keeps it brief for healthy folks
+  const anySymptoms = state.domainData.cardiac.symptoms.length || state.domainData.diabetes.symptoms.length || state.domainData.cancer.symptoms.length;
+  if(anySymptoms){
+    await botSay(`And just so we understand the timeline — has that been going on for a few days, a few weeks, or longer than that?`);
+    await new Promise(resolve=>{
+      showChips([{label:'A few days'},{label:'A few weeks'},{label:'Longer than that'}], (v)=>{
+        state.physicalDetail.duration = v;
+        resolve();
+      });
+    });
+  }
+
+  runConditions();
+}
+
+/* ---- diagnosed conditions: allergy / asthma / thyroid / kidney / pre-diabetes ---- */
+async function runConditions(){
+  const cap = state.openCapture;
+  addSpacer();
+  setProgress(38);
+  let skippedTap = false;
+  if(cap && cap.conditions.length){
+    state.conditions = cap.conditions;
+    skippedTap = true;
+    await botSay(`You also mentioned ${cap.conditions.join(', ').toLowerCase()} earlier — noted, no need to repeat that.`);
+  } else {
+    await botSay(`Moving on — take your time with these, they're just for our records, nothing to worry about. Have you been diagnosed with any of these? <span style="color:var(--t3);font-size:12px">(tap all that apply)</span>`);
+    await new Promise(resolve=>{
+      showChips([
+        {label:'Allergies'},{label:'Asthma'},{label:'Thyroid problems'},{label:'Kidney problems'},
+        {label:'Pre-diabetes / borderline sugar'},{label:'None of these', subtle:true}
+      ], (picked)=>{
+        state.conditions = picked;
+        resolve();
+      }, {multi:true, multiKeywords:CONDITION_KEYWORDS});
+    });
+  }
+
+  const hasConditions = (state.conditions||[]).some(c=>c!=='None of these');
+  if(hasConditions){
+    await botSay(`Are you currently on medication for that, managing it without meds, or a bit of both?`);
+    await new Promise(resolve=>{
+      showChips([{label:'On medication'},{label:'Managing without meds'},{label:'A bit of both'}], (v)=>{
+        state.conditionsDetail.managed = v;
+        resolve();
+      });
+    });
+  }
+
+  await botSay(`And is there anything else you're currently being treated for that we haven't touched on? Totally fine if not.`);
+  showChips([{label:'Nothing else'}], async (val, isText)=>{
+    if(isText){
+      state.conditionsDetail.extra = val;
+      await botSay(`Thanks for adding that — I'll make sure it's noted.`);
+    }
+    runLifestyle();
+  }, {allowText:true});
+}
+
+/* ---- lifestyle / social habits (smoking, tobacco, vaping, alcohol, exercise, sleep, diet) ---- */
+async function runLifestyle(){
+  const cap = state.openCapture;
+  addSpacer();
+  setProgress(54);
+  if(cap && cap.lifestyle.length){
+    state.shared.profile = cap.lifestyle;
+    await botSay(`On daily habits — you already covered that earlier, thanks, saves us both some time.`);
+  } else {
+    await botSay(`A few about day-to-day life — totally judgment-free, just helps us understand the full picture. Do any of these describe you? <span style="color:var(--t3);font-size:12px">(tap all that apply)</span>`);
+    await new Promise(resolve=>{
+      showChips([
+        {label:'Smoke cigarettes'},{label:'Use tobacco / gutkha / paan'},{label:'Vape / e-cigarettes'},
+        {label:'Drink alcohol regularly'},{label:'Rarely exercise'},{label:'Sleep poorly'},
+        {label:'None of these', subtle:true}
+      ], (picked)=>{
+        state.shared.profile = picked;
+        resolve();
+      }, {multi:true, multiKeywords:LIFESTYLE_KEYWORDS});
+    });
+  }
+
+  await botSay(`How would you describe your activity level generally?`);
+  await new Promise(resolve=>{
+    showChips([{label:'Active'},{label:'Somewhat active'},{label:'Mostly sedentary'}], (v)=>{
+      state.lifestyleExtra.activity = v;
+      resolve();
+    });
+  });
+
+  await botSay(`And your eating — mostly home-cooked, a mix, or mostly outside food?`);
+  showChips([{label:'Mostly home-cooked'},{label:'A mix'},{label:'Mostly outside food'}], (v)=>{
+    state.lifestyleExtra.diet = v;
+    runFamilyHistory();
+  });
+}
+
+/* ---- family history: one combined question, not one per disease ---- */
+async function runFamilyHistory(){
+  const cap = state.openCapture;
+  addSpacer();
+  setProgress(68);
+  if(cap && cap.fam.length){
+    state.famHistoryFlat = cap.fam;
+    await botSay(`And you already mentioned some family health history earlier — got it, no need to repeat that either.`);
+    return afterFamilyHistoryDetail();
+  }
+  await botSay(`Almost through this part — any of these in your immediate family, parents or siblings? No pressure if you're not sure. <span style="color:var(--t3);font-size:12px">(tap all that apply)</span>`);
+  showChips([
+    {label:'Heart disease'},{label:'Diabetes'},{label:'Cancer'},{label:'Thyroid problems'},
+    {label:'Kidney problems'},{label:'Asthma or allergies'},{label:'None of these', subtle:true}
+  ], (picked)=>{
+    state.famHistoryFlat = picked;
+    afterFamilyHistoryDetail();
+  }, {multi:true, multiKeywords:FAMILY_KEYWORDS});
+}
+
+async function afterFamilyHistoryDetail(){
+  const hasFamHistory = (state.famHistoryFlat||[]).some(f=>f!=='None of these');
+  if(hasFamHistory){
+    await botSay(`Would you say that's mostly on your mother's side, father's side, or both?`);
+    await new Promise(resolve=>{
+      showChips([{label:"Mother's side"},{label:"Father's side"},{label:'Both'},{label:'Not sure', subtle:true}], (v)=>{
+        state.famDetail.side = v;
+        resolve();
+      });
+    });
+    await botSay(`And roughly what age were they when diagnosed, if you happen to know?`);
+    await new Promise(resolve=>{
+      showChips([{label:'Before 40'},{label:'40 to 60'},{label:'After 60'},{label:"Don't know", subtle:true}], (v)=>{
+        state.famDetail.onset = v;
+        resolve();
+      });
+    });
+  }
+  afterFamilyHistory();
+}
+
+function afterFamilyHistory(){
+  // silently route the flat family-history answer into the right internal
+  // buckets for scoring — the employee never sees this split happen
+  state.domainData.cardiac.famHistory = state.famHistoryFlat.includes('Heart disease') ? 'Yes' : null;
+  state.domainData.diabetes.famHistory = state.famHistoryFlat.includes('Diabetes') ? 'Yes' : null;
+  state.domainData.cancer.famHistory = state.famHistoryFlat.includes('Cancer') ? 'Yes' : null;
+  if(state.facts.gender==='Female') return runWomensHealth();
+  runMental();
+}
+
+/* ---- women's health: PCOD, menstrual cycle, anemia — gated on gender ---- */
+async function runWomensHealth(){
+  addSpacer();
+  setProgress(78);
+  await botSay(`You're doing great — a few women's health questions now, answer whatever feels comfortable, skip what you'd rather not.`);
+  askWomensPCOD();
+}
+
+async function askWomensPCOD(){
+  const cap = state.openCapture;
+  if(cap && cap.womens.pcod===true){
+    state.womens.pcod='Yes';
+    await botSay(`You mentioned PCOD/PCOS earlier — noted, thank you.`);
+    return askWomensCycle();
+  }
+  await botSay(`Have you been diagnosed with PCOD or PCOS?`);
+  showChips([{label:'Yes'},{label:'No'},{label:'Not sure'}], (v)=>{
+    state.womens.pcod = v;
+    askWomensCycle();
+  });
+}
+
+async function askWomensCycle(){
+  const cap = state.openCapture;
+  if(cap && cap.womens.cycle===true){
+    state.womens.cycle='Irregular / painful';
+    await botSay(`And your cycle — already noted from earlier, thanks.`);
+    return askWomensAnemia();
+  }
+  await botSay(`Is your menstrual cycle generally regular, or would you say irregular or painful?`);
+  showChips([{label:'Regular'},{label:'Irregular'},{label:'Painful'},{label:'Prefer not to say', subtle:true}], (v)=>{
+    state.womens.cycle = v;
+    askWomensAnemia();
+  });
+}
+
+async function askWomensAnemia(){
+  const cap = state.openCapture;
+  if(cap && cap.womens.anemia===true){
+    state.womens.anemia='Yes';
+    await botSay(`And anemia — already noted from earlier, thanks.`);
+    return askWomensExtra();
+  }
+  await botSay(`Have you been diagnosed with, or do you suspect, anemia — low iron or hemoglobin?`);
+  showChips([{label:'Yes'},{label:'No'},{label:'Not sure'}], (v)=>{
+    state.womens.anemia = v;
+    askWomensExtra();
+  });
+}
+
+async function askWomensExtra(){
+  await botSay(`Anything else on the women's health side you'd like to mention? Totally fine to skip.`);
+  showChips([{label:'Nothing else, thanks'}], async (val, isText)=>{
+    if(isText){
+      state.womens.extra = val;
+      await botSay(`Thank you for sharing that — noted.`);
+    }
+    runMental();
+  }, {allowText:true});
+}
+
+/* ---------------- MENTAL HEALTH (always its own considerate space) ---------------- */
+async function runMental(){
+  addSpacer();
+  setProgress(88);
+  const cap = state.openCapture;
+  const intro = (cap && cap.mentalFlag)
+    ? `You mentioned something about stress or mood earlier — thank you for that, it's not always easy to bring up. I'd like to check in a little more, if that's okay. How have you been feeling lately, mentally and emotionally?`
+    : `Last part, and it matters just as much as everything else — there's no right answer, just how you honestly feel. How have you been lately, mentally and emotionally?`;
+  await botSay(intro);
+  showChips([
+    {label:"I'm doing okay"},
+    {label:"I've been more stressed than usual"},
+    {label:"Low mood, not enjoying things lately"},
+    {label:"I'd rather not answer", subtle:true},
+  ], async (val,isText)=>{
+    if(state.crisisTriggered) return;
+    if(val==="I'd rather not answer"){
+      state.domainData.mental.skipped = true;
+      await botSay(`Totally okay — no pressure at all. That's your call, always, and it won't be held against you in any way.`);
+      return finish();
+    }
+    state.domainData.mental.level = val;
+    const okay = val==="I'm doing okay";
+    await botSay(okay ? `Good to hear — genuinely.` : `Thanks for being honest about that — it takes something to say it.`);
+
+    if(!okay){
+      await botSay(`How often would you say that's true — rarely, sometimes, or most days?`);
+      await new Promise(resolve=>{
+        showChips([{label:'Rarely'},{label:'Sometimes'},{label:'Most days'}], (freq)=>{
+          state.domainData.mental.freq = freq;
+          resolve();
+        });
+      });
+      setProgress(94);
+      await botSay(`And is it getting in the way of work or day-to-day things?`);
+      await new Promise(resolve=>{
+        showChips([{label:'Yes, noticeably'},{label:'A little'},{label:'Not really'}], (impact)=>{
+          state.domainData.mental.impact = impact;
+          resolve();
+        });
+      });
+    }
+
+    await botSay(`One last one, and then we're done — do you feel like you have people you can talk to when things feel heavy?`);
+    showChips([{label:'Yes, definitely'},{label:'Somewhat'},{label:'Not really'}], (support)=>{
+      state.domainData.mental.support = support;
+      setProgress(100);
+      botSay(`Thank you — really. That context helps us support you properly, and I appreciate you being open with me.`).then(finish);
+    });
+  }, {allowText:true});
+}
+
+/* ---------------- FINISH ---------------- */
+function scoreDomain(domain){
+  const d = state.domainData[domain];
+  let points = 0;
+  const profile = (state.shared.profile||[]).map(p=>p.toLowerCase());
+  if(domain!=='mental'){
+    points += (d.symptoms||[]).length * 2;
+    if(d.famHistory==='Yes') points += 2;
+    if(profile.some(p=>p.includes('smoke'))) points += 2;
+    if(domain==='cancer' && profile.some(p=>p.includes('tobacco')||p.includes('gutkha')||p.includes('paan'))) points += 3;
+    if(domain==='cancer' && profile.some(p=>p.includes('vape'))) points += 1;
+    if(domain==='diabetes' && (state.conditions||[]).includes('Pre-diabetes / borderline sugar')) points += 4;
+  } else {
+    if(d.skipped) return {level:'skip', label:'Not shared'};
+    if(d.level==="I'm doing okay") points = 0;
+    else points = (d.freq==='Most days'?4:d.freq==='Sometimes'?2:1) + (d.impact==='Yes, noticeably'?3:d.impact==='A little'?1:0);
+  }
+  if(points>=6) return {level:'high', label:'High'};
+  if(points>=2) return {level:'mod', label:'Moderate'};
+  return {level:'low', label:'Low'};
+}
+
+const ACTIONS = {
+  cardiac:{low:'No action needed — recheck at next annual screening.', mod:'Get a BP + lipid profile within 4 weeks.', high:'Book a cardiac evaluation within a week.'},
+  diabetes:{low:'No action needed right now.', mod:'Fasting glucose test recommended within 4 weeks.', high:'HbA1c + fasting glucose recommended within 1 week.'},
+  cancer:{low:'No action needed right now.', mod:'A quick in-person check with our clinical team, within 2–4 weeks.', high:'Please see a doctor for evaluation within the week — this is worth prioritising.'},
+  mental:{low:'No action needed — you\'re doing fine.', mod:'A short chat with our wellness counsellor could help — entirely optional.', high:'We\'d really like to connect you with a counsellor this week. This stays private.', skip:'You chose not to share — that\'s completely fine, the door stays open anytime.'}
+};
+
+async function finish(){
+  if(state.crisisTriggered) return;
+  setProgress(100);
+  await botSay(`That's everything${state.facts.name ? ', ' + state.facts.name : ''} — thank you for being open with me. Here's your snapshot:`);
+
+  const wrap = document.createElement('div');
+  wrap.className='summary-wrap';
+  DOMAINS.forEach(domain=>{
+    const s = scoreDomain(domain);
+    const badgeClass = s.level==='low'?'badge-low':s.level==='mod'?'badge-mod':s.level==='high'?'badge-high':'badge-skip';
+    const action = ACTIONS[domain][s.level] || ACTIONS[domain].low;
+    const card = document.createElement('div');
+    card.className='sum-card';
+    card.innerHTML = `
+      <div class="sum-dot" style="background:${DOMAIN_META[domain].color}"></div>
+      <div class="sum-body">
+        <div class="sum-title">${DOMAIN_META[domain].label}</div>
+        <div class="sum-note">${action}</div>
+      </div>
+      <div class="sum-badge ${badgeClass}">${s.label}</div>
+    `;
+    wrap.appendChild(card);
+  });
+  chatEl.appendChild(wrap);
+
+  const btn = document.createElement('button');
+  btn.className='cta';
+  btn.textContent='Got it, close check-in';
+  btn.onclick = ()=>{ btn.textContent='Saved — thank you 🌿'; btn.disabled=true; };
+  wrap.appendChild(btn);
+
+  const disc = document.createElement('div');
+  disc.className='disclaimer';
+  disc.textContent = 'This is a wellness check-in, not a medical diagnosis. Your individual answers are visible only to your care team.';
+  wrap.appendChild(disc);
+
+  scrollDown();
+  inputbar.classList.add('hidden');
+}
+
+/* ============================================================
+   VOICE INPUT (Web Speech API — Chrome only, needs mic permission)
+   ============================================================ */
+const micBtn = document.getElementById('micBtn');
+let recognition = null;
+let listening = false;
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const secureOK = window.isSecureContext; // voice requires https (or localhost) — file:// pages are blocked by Chrome
+
+if(SpeechRecognition && secureOK){
+  recognition = new SpeechRecognition();
+  recognition.lang = 'en-IN';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 1;
+
+  recognition.onresult = (e)=>{
+    const transcript = e.results[0][0].transcript;
+    textInput.value = transcript;
+    submitFreeText();
+  };
+  recognition.onend = ()=>{ listening=false; micBtn.classList.remove('listening'); micNote.style.display='none'; };
+  recognition.onerror = (e)=>{
+    listening=false; micBtn.classList.remove('listening'); micNote.style.display='none';
+    const messages = {
+      'not-allowed': 'Mic permission was blocked. Check your browser\'s site settings and allow microphone access, then try again.',
+      'service-not-allowed': 'This browser blocked microphone access for this page.',
+      'no-speech': 'Didn\'t catch anything — try again and speak right after tapping the mic.',
+      'audio-capture': 'No microphone found on this device.',
+      'network': 'Connection issue reaching the speech service — try again.'
+    };
+    console.warn('Speech recognition error:', e.error);
+    if(e.error !== 'aborted' && e.error !== 'no-speech'){
+      alert(messages[e.error] || `Voice input error: ${e.error}. Typing still works fine.`);
+    }
+  };
+
+  micBtn.onclick = ()=>{
+    if(listening){ recognition.stop(); return; }
+    try{
+      recognition.start();
+      listening = true;
+      micBtn.classList.add('listening');
+      micNote.style.display='block';
+    }catch(err){
+      listening = false;
+      console.warn('Mic start failed:', err.name, err.message);
+      alert(`Couldn't start the mic (${err.name || 'unknown error'}). Typing works fine as a fallback.`);
+    }
+  };
+} else if(SpeechRecognition && !secureOK){
+  micBtn.onclick = ()=>{
+    alert('Voice input needs a secure connection (https). This file was opened directly (file://), which Chrome blocks mic access on for security reasons — that\'s the actual cause, not a busy mic. In production this runs on your real https:// domain and works normally. For now, typing works exactly the same.');
+  };
+} else {
+  micBtn.onclick = ()=>{
+    alert('Voice input needs Chrome (desktop or Android) with mic access. Typing works everywhere.');
+  };
+}
+
+function setRealViewportHeight(){
+  document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+}
+setRealViewportHeight();
+window.addEventListener('resize', setRealViewportHeight);
+window.addEventListener('orientationchange', setRealViewportHeight);
+
+start();
+</script>
+</body>
+</html>
