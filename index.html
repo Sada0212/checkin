@@ -123,7 +123,7 @@ body{font-family:'Inter',-apple-system,sans-serif;background:var(--bg);color:var
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
     </button>
   </div>
-  <div class="mic-note" id="micNote" style="display:none">Listening — speak now, then pause</div>
+  <div class="mic-note" id="micNote" style="display:none">Listening — take your time, tap the mic again when done</div>
 </div>
 
 <script>
@@ -578,6 +578,13 @@ async function runPhysicalCatchup(){
         resolve();
       });
     });
+    await botSay(`And how much would you say it's affecting your day-to-day — not really, a little, or quite a lot?`);
+    await new Promise(resolve=>{
+      showChips([{label:'Not really'},{label:'A little'},{label:'Quite a lot'}], (v)=>{
+        state.physicalDetail.severity = v;
+        resolve();
+      });
+    });
   }
 
   runConditions();
@@ -829,27 +836,100 @@ async function runMental(){
 }
 
 /* ---------------- FINISH ---------------- */
-function scoreDomain(domain){
-  const d = state.domainData[domain];
-  let points = 0;
+/* ============================================================
+   CLINICAL SCORING MODEL — Symptoms (0-5) + Duration (0-3) +
+   Severity/Functional impact (0-5) + Risk factors (0-5) per
+   disease, thresholds: 0-4 Low · 5-9 Moderate · ≥10 High.
+   NOTE on a real limitation: Duration/Severity are captured ONCE
+   in the neutral physical catch-up, not per-disease — so if
+   someone flags both a cardiac and a diabetes symptom, both
+   currently inherit the same duration/severity score. Asking
+   these per-disease would mean re-introducing labeled sections,
+   which conflicts with the "don't segregate" flow design. A real
+   build would resolve this via the LLM extraction step tagging
+   duration/severity per symptom mention, not per conversation turn.
+   ============================================================ */
+function scoreSymptoms(domain){
+  const n = (state.domainData[domain].symptoms||[]).length;
+  return n<=0 ? 0 : n===1 ? 2 : n===2 ? 3 : n===3 ? 4 : 5;
+}
+function scoreDuration(domain){
+  if(!(state.domainData[domain].symptoms||[]).length) return 0;
+  const map = {'A few days':1,'A few weeks':2,'Longer than that':3};
+  return map[state.physicalDetail.duration] || 0;
+}
+function scoreSeverity(domain){
+  if(!(state.domainData[domain].symptoms||[]).length) return 0;
+  const map = {'Not really':1,'A little':3,'Quite a lot':5};
+  return map[state.physicalDetail.severity] || 0;
+}
+function scoreRiskFactors(domain){
   const profile = (state.shared.profile||[]).map(p=>p.toLowerCase());
-  if(domain!=='mental'){
-    points += (d.symptoms||[]).length * 2;
-    if(d.famHistory==='Yes') points += 2;
-    if(profile.some(p=>p.includes('smoke'))) points += 2;
-    if(domain==='cancer' && profile.some(p=>p.includes('tobacco')||p.includes('gutkha')||p.includes('paan'))) points += 3;
-    if(domain==='cancer' && profile.some(p=>p.includes('vape'))) points += 1;
-    if(domain==='diabetes' && (state.conditions||[]).includes('Pre-diabetes / borderline sugar')) points += 4;
-  } else {
-    if(d.skipped) return {level:'skip', label:'Not shared'};
-    if(d.level==="I'm doing okay") points = 0;
-    else points = (d.freq==='Most days'?4:d.freq==='Sometimes'?2:1) + (d.impact==='Yes, noticeably'?3:d.impact==='A little'?1:0);
+  const fam = state.famHistoryFlat||[];
+  const famMap = {cardiac:'Heart disease', diabetes:'Diabetes', cancer:'Cancer'};
+  let pts = 0;
+  if(fam.includes(famMap[domain])) pts += 2;
+  const bmi = parseFloat(state.facts.bmi);
+  const age = parseInt(state.facts.age);
+  if(domain==='cardiac'){
+    if(profile.some(p=>p.includes('smoke'))) pts += 1;
+    if(profile.some(p=>p.includes('alcohol'))) pts += 1;
+    if(profile.some(p=>p.includes('rarely exercise'))) pts += 1;
+    if(bmi>=25) pts += 1;
+    if(age>=45) pts += 1;
   }
-  if(points>=6) return {level:'high', label:'High'};
-  if(points>=2) return {level:'mod', label:'Moderate'};
-  return {level:'low', label:'Low'};
+  if(domain==='diabetes'){
+    if((state.conditions||[]).includes('Pre-diabetes / borderline sugar')) pts += 2;
+    if(profile.some(p=>p.includes('rarely exercise'))) pts += 1;
+    if(bmi>=25) pts += 1;
+    if(state.lifestyleExtra.diet==='Mostly outside food') pts += 1;
+  }
+  if(domain==='cancer'){
+    if(profile.some(p=>p.includes('tobacco')||p.includes('gutkha')||p.includes('paan'))) pts += 2;
+    if(profile.some(p=>p.includes('smoke'))) pts += 1;
+    if(profile.some(p=>p.includes('vape'))) pts += 1;
+    if(profile.some(p=>p.includes('alcohol'))) pts += 1;
+  }
+  return Math.min(5, pts);
 }
 
+function scoreMentalDimensions(){
+  const d = state.domainData.mental;
+  const symptomsMap = {"I'm doing okay":0, "I've been more stressed than usual":3, "Low mood, not enjoying things lately":4};
+  const durMap = {'Rarely':1,'Sometimes':2,'Most days':3};
+  const sevMap = {'Not really':1,'A little':3,'Yes, noticeably':5};
+  const riskMap = {'Yes, definitely':0,'Somewhat':2,'Not really':4}; // low social support = higher risk
+  return {
+    symptoms: symptomsMap[d.level] ?? 0,
+    duration: durMap[d.freq] || 0,
+    severity: sevMap[d.impact] || 0,
+    risk: riskMap[d.support] ?? 0
+  };
+}
+
+function finalizeScore(dims){
+  const total = dims.symptoms + dims.duration + dims.severity + dims.risk;
+  const level = total>=10 ? 'high' : total>=5 ? 'mod' : 'low';
+  const label = total>=10 ? 'High' : total>=5 ? 'Moderate' : 'Low';
+  return {level, label, total, dims};
+}
+
+function scoreDomain(domain){
+  if(domain==='mental'){
+    if(state.domainData.mental.skipped) return {level:'skip', label:'Not shared'};
+    return finalizeScore(scoreMentalDimensions());
+  }
+  return finalizeScore({
+    symptoms: scoreSymptoms(domain),
+    duration: scoreDuration(domain),
+    severity: scoreSeverity(domain),
+    risk: scoreRiskFactors(domain)
+  });
+}
+
+// Recommended actions per risk tier — no longer shown to the employee.
+// Reserved for the internal care-team/HR dashboard view, which would read
+// this alongside backendPayload.scores (see finish() below).
 const ACTIONS = {
   cardiac:{low:'No action needed — recheck at next annual screening.', mod:'Get a BP + lipid profile within 4 weeks.', high:'Book a cardiac evaluation within a week.'},
   diabetes:{low:'No action needed right now.', mod:'Fasting glucose test recommended within 4 weeks.', high:'HbA1c + fasting glucose recommended within 1 week.'},
@@ -860,27 +940,39 @@ const ACTIONS = {
 async function finish(){
   if(state.crisisTriggered) return;
   setProgress(100);
-  await botSay(`That's everything${state.facts.name ? ', ' + state.facts.name : ''} — thank you for being open with me. Here's your snapshot:`);
+
+  // Full scoring still runs — it's just not shown to the employee anymore.
+  // This is what would actually be POSTed to the backend/care-team dashboard.
+  const backendPayload = {
+    name: state.facts.name, age: state.facts.age, gender: state.facts.gender, bmi: state.facts.bmi,
+    scores: {},
+    raw: {
+      conditions: state.conditions, conditionsDetail: state.conditionsDetail,
+      lifestyle: state.shared.profile, lifestyleExtra: state.lifestyleExtra,
+      familyHistory: state.famHistoryFlat, familyDetail: state.famDetail,
+      physicalDetail: state.physicalDetail, womens: state.womens,
+      mental: state.domainData.mental
+    }
+  };
+  DOMAINS.forEach(domain=>{ backendPayload.scores[domain] = scoreDomain(domain); });
+  console.log('[Curable] backend payload (would be sent to server):', backendPayload);
+
+  await botSay(`That's everything${state.facts.name ? ', ' + state.facts.name : ''} — thank you for being open with me. I really appreciate you taking the time.`);
+  await botSay(`Everything you've shared has been noted and passed to your care team. There's nothing further needed from you right now — if anything's worth a closer look, someone will personally reach out to arrange it, quietly and directly with you.`);
 
   const wrap = document.createElement('div');
   wrap.className='summary-wrap';
-  DOMAINS.forEach(domain=>{
-    const s = scoreDomain(domain);
-    const badgeClass = s.level==='low'?'badge-low':s.level==='mod'?'badge-mod':s.level==='high'?'badge-high':'badge-skip';
-    const action = ACTIONS[domain][s.level] || ACTIONS[domain].low;
-    const card = document.createElement('div');
-    card.className='sum-card';
-    card.innerHTML = `
-      <div class="sum-dot" style="background:${DOMAIN_META[domain].color}"></div>
-      <div class="sum-body">
-        <div class="sum-title">${DOMAIN_META[domain].label}</div>
-        <div class="sum-note">${action}</div>
-      </div>
-      <div class="sum-badge ${badgeClass}">${s.label}</div>
-    `;
-    wrap.appendChild(card);
-  });
-  chatEl.appendChild(wrap);
+
+  const card = document.createElement('div');
+  card.className='sum-card';
+  card.innerHTML = `
+    <div class="sum-dot" style="background:var(--green)"></div>
+    <div class="sum-body">
+      <div class="sum-title">Check-in complete</div>
+      <div class="sum-note">Your care team has everything they need. Thank you for trusting us with this.</div>
+    </div>
+  `;
+  wrap.appendChild(card);
 
   const btn = document.createElement('button');
   btn.className='cta';
@@ -893,37 +985,56 @@ async function finish(){
   disc.textContent = 'This is a wellness check-in, not a medical diagnosis. Your individual answers are visible only to your care team.';
   wrap.appendChild(disc);
 
+  chatEl.appendChild(wrap);
   scrollDown();
   inputbar.classList.add('hidden');
 }
 
 /* ============================================================
    VOICE INPUT (Web Speech API — Chrome only, needs mic permission)
+   Continuous mode: keeps listening through pauses/thinking time.
+   Tap the mic again to stop and send — it never auto-cuts you off.
    ============================================================ */
 const micBtn = document.getElementById('micBtn');
 let recognition = null;
 let listening = false;
+let finalTranscript = '';
+let hadError = false;
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const secureOK = window.isSecureContext; // voice requires https (or localhost) — file:// pages are blocked by Chrome
 
 if(SpeechRecognition && secureOK){
   recognition = new SpeechRecognition();
   recognition.lang = 'en-IN';
-  recognition.interimResults = false;
+  recognition.continuous = true;   // don't stop just because of a pause
+  recognition.interimResults = true; // show live captions while thinking
   recognition.maxAlternatives = 1;
 
   recognition.onresult = (e)=>{
-    const transcript = e.results[0][0].transcript;
-    textInput.value = transcript;
-    submitFreeText();
+    let interim = '';
+    for(let i=e.resultIndex; i<e.results.length; i++){
+      const t = e.results[i][0].transcript;
+      if(e.results[i].isFinal) finalTranscript += t + ' ';
+      else interim += t;
+    }
+    textInput.value = (finalTranscript + interim).trim();
   };
-  recognition.onend = ()=>{ listening=false; micBtn.classList.remove('listening'); micNote.style.display='none'; };
+
+  recognition.onend = ()=>{
+    listening=false; micBtn.classList.remove('listening'); micBtn.title='Speak your answer'; micNote.style.display='none';
+    if(!hadError && textInput.value.trim()){
+      submitFreeText();
+    }
+    finalTranscript=''; hadError=false;
+  };
+
   recognition.onerror = (e)=>{
+    hadError = true;
     listening=false; micBtn.classList.remove('listening'); micNote.style.display='none';
     const messages = {
       'not-allowed': 'Mic permission was blocked. Check your browser\'s site settings and allow microphone access, then try again.',
       'service-not-allowed': 'This browser blocked microphone access for this page.',
-      'no-speech': 'Didn\'t catch anything — try again and speak right after tapping the mic.',
+      'no-speech': 'Didn\'t catch anything — tap the mic and try again.',
       'audio-capture': 'No microphone found on this device.',
       'network': 'Connection issue reaching the speech service — try again.'
     };
@@ -934,11 +1045,16 @@ if(SpeechRecognition && secureOK){
   };
 
   micBtn.onclick = ()=>{
-    if(listening){ recognition.stop(); return; }
+    if(listening){ recognition.stop(); return; } // manual stop → sends what was captured
     try{
+      finalTranscript = '';
+      hadError = false;
+      textInput.value = '';
       recognition.start();
       listening = true;
       micBtn.classList.add('listening');
+      micBtn.title = 'Tap to stop and send';
+      micNote.textContent = 'Listening — take your time, tap the mic again when done';
       micNote.style.display='block';
     }catch(err){
       listening = false;
